@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useMetricsHistory } from './hooks/useMetricsHistory';
 import { getStatus, updateConfig, start, stop, reset } from './api/client';
@@ -20,7 +20,13 @@ function App() {
   const [latestMetrics, setLatestMetrics] = useState(null);
 
   const { isConnected, lastMessage } = useWebSocket('/ws/metrics');
-  const { history, addMetric, clearHistory } = useMetricsHistory();
+  const { getDisplayData, addMetric, clearHistory, version } = useMetricsHistory();
+
+  // Track the last processed message to avoid duplicate processing
+  const lastProcessedRef = useRef(null);
+
+  // Memoize display data to prevent unnecessary re-computations
+  const displayData = useMemo(() => getDisplayData(), [getDisplayData]);
 
   // Fetch initial status
   useEffect(() => {
@@ -30,9 +36,12 @@ function App() {
     }).catch(console.error);
   }, []);
 
-  // Update metrics from WebSocket
+  // Update metrics from WebSocket - use ref to track changes
+  // This pattern is intentional: we need to sync external WebSocket data to React state
   useEffect(() => {
-    if (lastMessage) {
+    if (lastMessage && lastMessage !== lastProcessedRef.current) {
+      lastProcessedRef.current = lastMessage;
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setLatestMetrics(lastMessage);
       addMetric(lastMessage);
     }
@@ -117,15 +126,15 @@ function App() {
 
           {/* Charts */}
           <div className="lg:col-span-3 space-y-6">
-            <LatencyChart history={history} />
-            <ThroughputChart history={history} />
+            <LatencyChart displayData={displayData} version={version} />
+            <ThroughputChart displayData={displayData} version={version} />
           </div>
         </div>
 
         {/* Bottom Section: Stats + Errors */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <StatsPanel metrics={latestMetrics} />
-          <ErrorChart history={history} />
+          <ErrorChart displayData={displayData} version={version} />
         </div>
       </main>
     </div>

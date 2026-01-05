@@ -1,6 +1,7 @@
+import { memo } from 'react';
 import { formatNumber, formatPercent } from '../utils/formatting';
 
-export function StatsPanel({ metrics }) {
+function StatsPanelInner({ metrics }) {
   if (!metrics) {
     return (
       <div className="bg-slate-800 rounded-lg p-6">
@@ -37,7 +38,7 @@ export function StatsPanel({ metrics }) {
   );
 }
 
-function StatCard({ label, value, variant = 'default' }) {
+const StatCard = memo(function StatCard({ label, value, variant = 'default' }) {
   const valueColor = variant === 'error' ? 'text-red-400' : 'text-white';
 
   return (
@@ -46,4 +47,6 @@ function StatCard({ label, value, variant = 'default' }) {
       <div className={`text-2xl font-mono font-bold ${valueColor}`}>{value}</div>
     </div>
   );
-}
+});
+
+export const StatsPanel = memo(StatsPanelInner);

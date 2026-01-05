@@ -10,9 +10,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "lodash-es": "^4.17.22",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "recharts": "^3.6.0"
+    "recharts": "^3.6.0",
+    "uplot": "^1.6.32"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

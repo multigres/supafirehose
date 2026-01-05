@@ -1,4 +1,4 @@
-.PHONY: all build dev run clean frontend backend
+.PHONY: all build dev run clean frontend backend image
 
 # Default target
 all: build
@@ -47,3 +47,7 @@ fmt:
 tidy:
 	go mod tidy
 	cd frontend && npm install
+
+# Build Docker image
+image: build
+	docker build -t supafirehose:latest .
