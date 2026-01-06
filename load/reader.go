@@ -52,6 +52,10 @@ func (w *ReadWorker) Run(ctx context.Context) {
 		// Create a new connection
 		conn, err := w.connMgr.Connect(ctx)
 		if err != nil {
+			// Don't record context cancellation as error (expected during shutdown)
+			if ctx.Err() != nil {
+				return
+			}
 			// Record connection error and backoff
 			w.collector.RecordRead(0, err)
 			time.Sleep(100 * time.Millisecond)
@@ -61,8 +65,8 @@ func (w *ReadWorker) Run(ctx context.Context) {
 		// Run queries on this connection until churn or context done
 		w.runWithConnection(ctx, conn)
 
-		// Close connection
-		conn.Close(ctx)
+		// Close connection (use background context to ensure clean close)
+		conn.Close(context.Background())
 		w.connMgr.Release()
 	}
 }
@@ -119,5 +123,10 @@ func (w *ReadWorker) executeRead(ctx context.Context, conn *pgx.Conn) {
 	).Scan(&user.ID, &user.Username, &user.Email, &user.CreatedAt)
 
 	latency := time.Since(start)
+
+	// Don't record context cancellation as an error (expected during shutdown)
+	if err != nil && ctx.Err() != nil {
+		return
+	}
 	w.collector.RecordRead(latency, err)
 }

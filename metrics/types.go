@@ -2,11 +2,18 @@ package metrics
 
 // MetricsSnapshot represents a point-in-time snapshot of all metrics
 type MetricsSnapshot struct {
-	Timestamp int64          `json:"timestamp"`
-	Reads     OperationStats `json:"reads"`
-	Writes    OperationStats `json:"writes"`
-	Totals    TotalStats     `json:"totals"`
-	Pool      PoolStats      `json:"pool"`
+	Timestamp    int64          `json:"timestamp"`
+	Reads        OperationStats `json:"reads"`
+	Writes       OperationStats `json:"writes"`
+	Totals       TotalStats     `json:"totals"`
+	Pool         PoolStats      `json:"pool"`
+	RecentErrors []ErrorEntry   `json:"recent_errors,omitempty"`
+}
+
+// ErrorEntry represents a single error with timestamp
+type ErrorEntry struct {
+	Timestamp int64  `json:"timestamp"`
+	Message   string `json:"message"`
 }
 
 // OperationStats holds metrics for a specific operation type (read/write)

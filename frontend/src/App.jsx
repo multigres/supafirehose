@@ -7,7 +7,7 @@ import { ControlPanel } from './components/ControlPanel';
 import { StatsPanel } from './components/StatsPanel';
 import { LatencyChart } from './components/LatencyChart';
 import { ThroughputChart } from './components/ThroughputChart';
-import { ErrorChart } from './components/ErrorChart';
+import { ErrorList } from './components/ErrorList';
 
 function App() {
   const [config, setConfig] = useState({
@@ -134,7 +134,7 @@ function App() {
         {/* Bottom Section: Stats + Errors */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <StatsPanel metrics={latestMetrics} />
-          <ErrorChart displayData={displayData} version={version} />
+          <ErrorList errors={latestMetrics?.recent_errors} />
         </div>
       </main>
     </div>

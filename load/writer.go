@@ -43,6 +43,10 @@ func (w *WriteWorker) Run(ctx context.Context) {
 		// Create a new connection
 		conn, err := w.connMgr.Connect(ctx)
 		if err != nil {
+			// Don't record context cancellation as error (expected during shutdown)
+			if ctx.Err() != nil {
+				return
+			}
 			// Record connection error and backoff
 			w.collector.RecordWrite(0, err)
 			time.Sleep(100 * time.Millisecond)
@@ -52,8 +56,8 @@ func (w *WriteWorker) Run(ctx context.Context) {
 		// Run queries on this connection until churn or context done
 		w.runWithConnection(ctx, conn)
 
-		// Close connection
-		conn.Close(ctx)
+		// Close connection (use background context to ensure clean close)
+		conn.Close(context.Background())
 		w.connMgr.Release()
 	}
 }
@@ -64,12 +68,9 @@ func (w *WriteWorker) runWithConnection(ctx context.Context, conn *pgx.Conn) {
 	if w.churnRate > 0 {
 		avgLifetime := time.Duration(float64(time.Second) / w.churnRate)
 		lifetime := time.Duration(rand.ExpFloat64() * float64(avgLifetime))
-		if lifetime < 100*time.Millisecond {
-			lifetime = 100 * time.Millisecond
-		}
-		if lifetime > 60*time.Second {
-			lifetime = 60 * time.Second
-		}
+		// Clamp lifetime to reasonable bounds
+		lifetime = max(lifetime, 100*time.Millisecond)
+		lifetime = min(lifetime, 60*time.Second)
 		churnAfter = time.Now().Add(lifetime)
 	}
 
@@ -109,5 +110,10 @@ func (w *WriteWorker) executeWrite(ctx context.Context, conn *pgx.Conn) {
 	).Scan(&newID)
 
 	latency := time.Since(start)
+
+	// Don't record context cancellation as an error (expected during shutdown)
+	if err != nil && ctx.Err() != nil {
+		return
+	}
 	w.collector.RecordWrite(latency, err)
 }

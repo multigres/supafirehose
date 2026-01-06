@@ -24,6 +24,11 @@ type Collector struct {
 	totalQueries atomic.Int64
 	totalErrors  atomic.Int64
 
+	// Recent errors list (for UI visibility)
+	recentErrors    []ErrorEntry
+	lastErrorTime   time.Time
+	maxRecentErrors int
+
 	// Pool stats function
 	poolStatsFunc func() PoolStats
 
@@ -34,10 +39,12 @@ type Collector struct {
 // NewCollector creates a new metrics collector
 func NewCollector(poolStatsFunc func() PoolStats) *Collector {
 	return &Collector{
-		readLatencies:  NewHistogram(),
-		writeLatencies: NewHistogram(),
-		poolStatsFunc:  poolStatsFunc,
-		startTime:      time.Now(),
+		readLatencies:   NewHistogram(),
+		writeLatencies:  NewHistogram(),
+		poolStatsFunc:   poolStatsFunc,
+		startTime:       time.Now(),
+		recentErrors:    make([]ErrorEntry, 0),
+		maxRecentErrors: 10, // Keep last 10 errors
 	}
 }
 
@@ -50,6 +57,7 @@ func (c *Collector) RecordRead(latency time.Duration, err error) {
 	if err != nil {
 		atomic.AddInt64(&c.readErrors, 1)
 		c.totalErrors.Add(1)
+		c.addError("read: " + err.Error())
 	}
 }
 
@@ -62,6 +70,31 @@ func (c *Collector) RecordWrite(latency time.Duration, err error) {
 	if err != nil {
 		atomic.AddInt64(&c.writeErrors, 1)
 		c.totalErrors.Add(1)
+		c.addError("write: " + err.Error())
+	}
+}
+
+// addError adds an error to the recent errors list (rate limited to 1 per 10 seconds)
+func (c *Collector) addError(errMsg string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	// Rate limit: only add 1 error per 10 seconds
+	if time.Since(c.lastErrorTime) < 10*time.Second {
+		return
+	}
+	c.lastErrorTime = time.Now()
+
+	// Add new error
+	entry := ErrorEntry{
+		Timestamp: time.Now().UnixMilli(),
+		Message:   errMsg,
+	}
+	c.recentErrors = append(c.recentErrors, entry)
+
+	// Trim to max size
+	if len(c.recentErrors) > c.maxRecentErrors {
+		c.recentErrors = c.recentErrors[len(c.recentErrors)-c.maxRecentErrors:]
 	}
 }
 
@@ -98,6 +131,12 @@ func (c *Collector) Snapshot(interval time.Duration) MetricsSnapshot {
 		poolStats = c.poolStatsFunc()
 	}
 
+	// Get recent errors
+	c.mu.RLock()
+	recentErrors := make([]ErrorEntry, len(c.recentErrors))
+	copy(recentErrors, c.recentErrors)
+	c.mu.RUnlock()
+
 	return MetricsSnapshot{
 		Timestamp: time.Now().UnixMilli(),
 		Reads: OperationStats{
@@ -119,7 +158,8 @@ func (c *Collector) Snapshot(interval time.Duration) MetricsSnapshot {
 			Errors:    totalErrors,
 			ErrorRate: errorRate,
 		},
-		Pool: poolStats,
+		Pool:         poolStats,
+		RecentErrors: recentErrors,
 	}
 }
 
@@ -134,6 +174,12 @@ func (c *Collector) Reset() {
 	c.totalQueries.Store(0)
 	c.totalErrors.Store(0)
 	c.startTime = time.Now()
+
+	// Clear recent errors
+	c.mu.Lock()
+	c.recentErrors = make([]ErrorEntry, 0)
+	c.lastErrorTime = time.Time{}
+	c.mu.Unlock()
 }
 
 // Uptime returns the duration since the collector was created or reset
