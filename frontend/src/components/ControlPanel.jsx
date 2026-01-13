@@ -31,8 +31,8 @@ export function ControlPanel({ config, running, onConfigChange, onStart, onStop,
           label="Read QPS"
           value={localConfig.read_qps}
           min={0}
-          max={500000}
-          step={1000}
+          max={25000}
+          step={100}
           onChange={(v) => handleSliderChange('read_qps', v)}
         />
 
@@ -40,8 +40,8 @@ export function ControlPanel({ config, running, onConfigChange, onStart, onStop,
           label="Write QPS"
           value={localConfig.write_qps}
           min={0}
-          max={500000}
-          step={1000}
+          max={5000}
+          step={50}
           onChange={(v) => handleSliderChange('write_qps', v)}
         />
 
@@ -49,8 +49,8 @@ export function ControlPanel({ config, running, onConfigChange, onStart, onStop,
           label="Churn Rate"
           value={localConfig.churn_rate}
           min={0}
-          max={10000}
-          step={100}
+          max={2000}
+          step={10}
           onChange={(v) => handleSliderChange('churn_rate', v)}
           hint="connections/sec"
         />
