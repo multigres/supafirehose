@@ -7,6 +7,7 @@ import (
 
 	"supafirehose/db"
 	"supafirehose/metrics"
+	"supafirehose/schema"
 
 	"github.com/jackc/pgx/v5"
 	"golang.org/x/time/rate"
@@ -14,34 +15,29 @@ import (
 
 // ReadWorker executes read queries against the database
 type ReadWorker struct {
-	connMgr     *db.ConnectionManager
-	limiter     *rate.Limiter
-	collector   *metrics.Collector
-	maxID       int64
-	churnRate   float64 // Probability of churning connection per second
+	connMgr   *db.ConnectionManager
+	limiter   *rate.Limiter
+	collector *metrics.Collector
+	scenario  schema.Scenario
+	churnRate float64 // Probability of churning connection per second
 }
 
 // NewReadWorker creates a new read worker
-func NewReadWorker(connMgr *db.ConnectionManager, limiter *rate.Limiter, collector *metrics.Collector, maxID int64, churnRate float64) *ReadWorker {
+func NewReadWorker(connMgr *db.ConnectionManager, limiter *rate.Limiter, collector *metrics.Collector, scenario schema.Scenario, churnRate float64) *ReadWorker {
 	return &ReadWorker{
 		connMgr:   connMgr,
 		limiter:   limiter,
 		collector: collector,
-		maxID:     maxID,
+		scenario:  scenario,
 		churnRate: churnRate,
 	}
 }
 
-// User represents a row from the users table
-type User struct {
-	ID        int64
-	Username  string
-	Email     string
-	CreatedAt time.Time
-}
-
 // Run starts the read worker loop with its own connection
 func (w *ReadWorker) Run(ctx context.Context) {
+	// Track if scenario has been initialized (for custom scenarios)
+	scenarioInitialized := false
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -60,6 +56,18 @@ func (w *ReadWorker) Run(ctx context.Context) {
 			w.collector.RecordRead(0, err)
 			time.Sleep(100 * time.Millisecond)
 			continue
+		}
+
+		// Initialize scenario if needed (for custom scenarios that need table introspection)
+		if !scenarioInitialized {
+			if err := w.scenario.Initialize(ctx, conn); err != nil {
+				w.collector.RecordRead(0, err)
+				conn.Close(context.Background())
+				w.connMgr.Release()
+				time.Sleep(100 * time.Millisecond)
+				continue
+			}
+			scenarioInitialized = true
 		}
 
 		// Run queries on this connection until churn or context done
@@ -113,14 +121,7 @@ func (w *ReadWorker) runWithConnection(ctx context.Context, conn *pgx.Conn) {
 func (w *ReadWorker) executeRead(ctx context.Context, conn *pgx.Conn) {
 	start := time.Now()
 
-	// Random ID within the known range
-	id := rand.Int63n(w.maxID) + 1
-
-	var user User
-	err := conn.QueryRow(ctx,
-		"SELECT id, username, email, created_at FROM users WHERE id = $1",
-		id,
-	).Scan(&user.ID, &user.Username, &user.Email, &user.CreatedAt)
+	err := w.scenario.ExecuteRead(ctx, conn)
 
 	latency := time.Since(start)
 

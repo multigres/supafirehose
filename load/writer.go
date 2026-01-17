@@ -2,12 +2,12 @@ package load
 
 import (
 	"context"
-	"fmt"
 	"math/rand"
 	"time"
 
 	"supafirehose/db"
 	"supafirehose/metrics"
+	"supafirehose/schema"
 
 	"github.com/jackc/pgx/v5"
 	"golang.org/x/time/rate"
@@ -18,21 +18,26 @@ type WriteWorker struct {
 	connMgr   *db.ConnectionManager
 	limiter   *rate.Limiter
 	collector *metrics.Collector
+	scenario  schema.Scenario
 	churnRate float64 // Probability of churning connection per second
 }
 
 // NewWriteWorker creates a new write worker
-func NewWriteWorker(connMgr *db.ConnectionManager, limiter *rate.Limiter, collector *metrics.Collector, churnRate float64) *WriteWorker {
+func NewWriteWorker(connMgr *db.ConnectionManager, limiter *rate.Limiter, collector *metrics.Collector, scenario schema.Scenario, churnRate float64) *WriteWorker {
 	return &WriteWorker{
 		connMgr:   connMgr,
 		limiter:   limiter,
 		collector: collector,
+		scenario:  scenario,
 		churnRate: churnRate,
 	}
 }
 
 // Run starts the write worker loop with its own connection
 func (w *WriteWorker) Run(ctx context.Context) {
+	// Track if scenario has been initialized (for custom scenarios)
+	scenarioInitialized := false
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -51,6 +56,18 @@ func (w *WriteWorker) Run(ctx context.Context) {
 			w.collector.RecordWrite(0, err)
 			time.Sleep(100 * time.Millisecond)
 			continue
+		}
+
+		// Initialize scenario if needed (for custom scenarios that need table introspection)
+		if !scenarioInitialized {
+			if err := w.scenario.Initialize(ctx, conn); err != nil {
+				w.collector.RecordWrite(0, err)
+				conn.Close(context.Background())
+				w.connMgr.Release()
+				time.Sleep(100 * time.Millisecond)
+				continue
+			}
+			scenarioInitialized = true
 		}
 
 		// Run queries on this connection until churn or context done
@@ -98,16 +115,7 @@ func (w *WriteWorker) runWithConnection(ctx context.Context, conn *pgx.Conn) {
 func (w *WriteWorker) executeWrite(ctx context.Context, conn *pgx.Conn) {
 	start := time.Now()
 
-	// Generate random user data
-	randNum := rand.Int63()
-	username := fmt.Sprintf("user_%d", randNum)
-	email := fmt.Sprintf("user_%d@example.com", randNum)
-
-	var newID int64
-	err := conn.QueryRow(ctx,
-		"INSERT INTO users (username, email) VALUES ($1, $2) RETURNING id",
-		username, email,
-	).Scan(&newID)
+	err := w.scenario.ExecuteWrite(ctx, conn)
 
 	latency := time.Since(start)
 

@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useMetricsHistory } from './hooks/useMetricsHistory';
-import { getStatus, updateConfig, start, stop, reset } from './api/client';
+import { getStatus, getScenarios, updateConfig, start, stop, reset } from './api/client';
 import { ConnectionStatus } from './components/ConnectionStatus';
 import { ControlPanel } from './components/ControlPanel';
 import { StatsPanel } from './components/StatsPanel';
@@ -15,7 +15,10 @@ function App() {
     read_qps: 100,
     write_qps: 10,
     churn_rate: 0,
+    scenario: 'simple',
+    custom_table: '',
   });
+  const [scenarios, setScenarios] = useState([]);
   const [running, setRunning] = useState(false);
   const [latestMetrics, setLatestMetrics] = useState(null);
 
@@ -28,11 +31,15 @@ function App() {
   // Memoize display data to prevent unnecessary re-computations
   const displayData = useMemo(() => getDisplayData(), [getDisplayData]);
 
-  // Fetch initial status
+  // Fetch initial status and scenarios
   useEffect(() => {
     getStatus().then((status) => {
       setRunning(status.running);
       setConfig(status.config);
+    }).catch(console.error);
+
+    getScenarios().then((data) => {
+      setScenarios(data.scenarios || []);
     }).catch(console.error);
   }, []);
 
@@ -116,6 +123,7 @@ function App() {
           <div className="lg:col-span-1">
             <ControlPanel
               config={config}
+              scenarios={scenarios}
               running={running}
               onConfigChange={handleConfigChange}
               onStart={handleStart}

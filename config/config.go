@@ -26,7 +26,10 @@ type Config struct {
 
 	// Metrics
 	MetricsInterval time.Duration
-	MaxUserID       int64
+
+	// Schema scenario
+	DefaultScenario string
+	CustomTable     string
 }
 
 // Load reads configuration from environment variables with defaults
@@ -41,7 +44,8 @@ func Load() *Config {
 		MaxReadQPS:         getEnvInt("MAX_READ_QPS", 500000),
 		MaxWriteQPS:        getEnvInt("MAX_WRITE_QPS", 500000),
 		MetricsInterval:    getEnvDuration("METRICS_INTERVAL", 100*time.Millisecond),
-		MaxUserID:          getEnvInt64("MAX_USER_ID", 100000),
+		DefaultScenario:    getEnv("DEFAULT_SCENARIO", "simple"),
+		CustomTable:        getEnv("CUSTOM_TABLE", ""),
 	}
 }
 

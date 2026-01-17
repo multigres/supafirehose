@@ -5,6 +5,11 @@ export async function getStatus() {
   return response.json();
 }
 
+export async function getScenarios() {
+  const response = await fetch(`${API_BASE}/scenarios`);
+  return response.json();
+}
+
 export async function updateConfig(config) {
   const response = await fetch(`${API_BASE}/config`, {
     method: 'POST',

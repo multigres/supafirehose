@@ -47,20 +47,30 @@ func main() {
 
 	// Create metrics collector with connection stats function
 	collector := metrics.NewCollector(func() metrics.PoolStats {
+		// Get database size (ignore errors, just return 0 if it fails)
+		dbSize, _ := connMgr.GetDatabaseSize(ctx)
 		return metrics.PoolStats{
 			ActiveConnections: connMgr.ActiveConnections(),
 			IdleConnections:   0,
 			WaitingRequests:   0,
+			DatabaseSizeBytes: dbSize,
 		}
 	})
 
 	// Create load controller
-	controller := load.NewController(connMgr, collector, cfg.MaxUserID)
+	controller := load.NewController(connMgr, collector)
+
+	// Set initial scenario
+	controller.SetScenario(cfg.DefaultScenario, cfg.CustomTable)
+
+	// Set initial config
 	controller.SetConfig(load.Config{
 		Connections: cfg.DefaultConnections,
 		ReadQPS:     cfg.DefaultReadQPS,
 		WriteQPS:    cfg.DefaultWriteQPS,
 		ChurnRate:   0,
+		Scenario:    cfg.DefaultScenario,
+		CustomTable: cfg.CustomTable,
 	})
 
 	// Create API handlers

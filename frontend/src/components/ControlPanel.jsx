@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 
-export function ControlPanel({ config, running, onConfigChange, onStart, onStop, onReset }) {
+export function ControlPanel({ config, scenarios, running, onConfigChange, onStart, onStop, onReset }) {
   const [localConfig, setLocalConfig] = useState(config);
 
   useEffect(() => {
@@ -13,11 +13,63 @@ export function ControlPanel({ config, running, onConfigChange, onStart, onStop,
     onConfigChange(newConfig);
   };
 
+  const handleScenarioChange = (scenario) => {
+    const newConfig = { ...localConfig, scenario };
+    // Clear custom_table if not custom scenario
+    if (scenario !== 'custom') {
+      newConfig.custom_table = '';
+    }
+    setLocalConfig(newConfig);
+    onConfigChange(newConfig);
+  };
+
+  const handleCustomTableChange = (customTable) => {
+    const newConfig = { ...localConfig, custom_table: customTable };
+    setLocalConfig(newConfig);
+    // Don't auto-submit custom table - wait for blur or enter
+  };
+
+  const submitCustomTable = () => {
+    onConfigChange(localConfig);
+  };
+
   return (
     <div className="bg-slate-800 rounded-lg p-6 space-y-6">
       <h2 className="text-lg font-semibold text-white">Control Panel</h2>
 
       <div className="space-y-4">
+        {/* Scenario Selector */}
+        <div className="space-y-2">
+          <label className="block text-sm text-slate-300">Schema Scenario</label>
+          <select
+            value={localConfig.scenario || 'simple'}
+            onChange={(e) => handleScenarioChange(e.target.value)}
+            className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            {scenarios.map((s) => (
+              <option key={s.name} value={s.name}>
+                {s.name} - {s.description}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Custom Table Input */}
+        {localConfig.scenario === 'custom' && (
+          <div className="space-y-2">
+            <label className="block text-sm text-slate-300">Table Name</label>
+            <input
+              type="text"
+              value={localConfig.custom_table || ''}
+              onChange={(e) => handleCustomTableChange(e.target.value)}
+              onBlur={submitCustomTable}
+              onKeyDown={(e) => e.key === 'Enter' && submitCustomTable()}
+              placeholder="schema.table_name"
+              className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-slate-500"
+            />
+          </div>
+        )}
+
         <SliderControl
           label="Connections"
           value={localConfig.connections}

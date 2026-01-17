@@ -62,3 +62,19 @@ func (cm *ConnectionManager) Ping(ctx context.Context) error {
 	defer conn.Close(ctx)
 	return conn.Ping(ctx)
 }
+
+// GetDatabaseSize returns the current database size in bytes
+func (cm *ConnectionManager) GetDatabaseSize(ctx context.Context) (int64, error) {
+	conn, err := pgx.Connect(ctx, cm.connString)
+	if err != nil {
+		return 0, fmt.Errorf("failed to connect: %w", err)
+	}
+	defer conn.Close(ctx)
+
+	var size int64
+	err = conn.QueryRow(ctx, "SELECT pg_database_size(current_database())").Scan(&size)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get database size: %w", err)
+	}
+	return size, nil
+}

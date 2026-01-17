@@ -37,4 +37,5 @@ type PoolStats struct {
 	ActiveConnections int32 `json:"active_connections"`
 	IdleConnections   int32 `json:"idle_connections"`
 	WaitingRequests   int32 `json:"waiting_requests"`
+	DatabaseSizeBytes int64 `json:"database_size_bytes"`
 }

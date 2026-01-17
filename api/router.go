@@ -16,6 +16,7 @@ func NewRouter(handlers *Handlers, wsHub *WebSocketHub, staticFS fs.FS) http.Han
 	mux.HandleFunc("/api/start", handlers.HandleStart)
 	mux.HandleFunc("/api/stop", handlers.HandleStop)
 	mux.HandleFunc("/api/reset", handlers.HandleReset)
+	mux.HandleFunc("/api/scenarios", handlers.HandleScenarios)
 
 	// WebSocket route
 	mux.HandleFunc("/ws/metrics", wsHub.HandleWebSocket)

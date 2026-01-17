@@ -8,7 +8,7 @@ build: frontend backend
 
 # Build frontend
 frontend:
-	cd frontend && npm install && npm run build
+	cd frontend && pnpm install && pnpm run build
 
 # Build backend (includes embedded frontend)
 backend:
@@ -41,12 +41,12 @@ test:
 # Format code
 fmt:
 	go fmt ./...
-	cd frontend && npm run format 2>/dev/null || true
+	cd frontend && pnpm run format 2>/dev/null || true
 
 # Tidy dependencies
 tidy:
 	go mod tidy
-	cd frontend && npm install
+	cd frontend && pnpm install
 
 # Build Docker image
 image: build
