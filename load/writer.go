@@ -89,13 +89,15 @@ func (w *WriteWorker) runWithConnection(ctx context.Context, conn *pgx.Conn) {
 				return
 			}
 
-			// Execute query
-			w.executeWrite(ctx, conn)
+			// Execute query; abandon connection on error to force reconnect
+			if err := w.executeWrite(ctx, conn); err != nil {
+				return
+			}
 		}
 	}
 }
 
-func (w *WriteWorker) executeWrite(ctx context.Context, conn *pgx.Conn) {
+func (w *WriteWorker) executeWrite(ctx context.Context, conn *pgx.Conn) error {
 	start := time.Now()
 
 	// Generate random user data
@@ -113,7 +115,8 @@ func (w *WriteWorker) executeWrite(ctx context.Context, conn *pgx.Conn) {
 
 	// Don't record context cancellation as an error (expected during shutdown)
 	if err != nil && ctx.Err() != nil {
-		return
+		return err
 	}
 	w.collector.RecordWrite(latency, err)
+	return err
 }

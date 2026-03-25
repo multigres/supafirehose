@@ -18,9 +18,10 @@ function App() {
   });
   const [running, setRunning] = useState(false);
   const [latestMetrics, setLatestMetrics] = useState(null);
+  const [recentErrors, setRecentErrors] = useState([]);
 
   const { isConnected, lastMessage } = useWebSocket('/ws/metrics');
-  const { getDisplayData, addMetric, clearHistory, version } = useMetricsHistory();
+  const { getDisplayData, addMetric, clearHistory } = useMetricsHistory();
 
   // Track the last processed message to avoid duplicate processing
   const lastProcessedRef = useRef(null);
@@ -44,6 +45,11 @@ function App() {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setLatestMetrics(lastMessage);
       addMetric(lastMessage);
+      // Only update errors when the backend includes them (omitted = unchanged)
+      if (lastMessage.recent_errors) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setRecentErrors(lastMessage.recent_errors);
+      }
     }
   }, [lastMessage, addMetric]);
 
@@ -79,6 +85,7 @@ function App() {
       await reset();
       clearHistory();
       setLatestMetrics(null);
+      setRecentErrors([]);
     } catch (error) {
       console.error('Failed to reset:', error);
     }
@@ -126,15 +133,15 @@ function App() {
 
           {/* Charts */}
           <div className="lg:col-span-3 space-y-6">
-            <LatencyChart displayData={displayData} version={version} />
-            <ThroughputChart displayData={displayData} version={version} />
+            <LatencyChart displayData={displayData} />
+            <ThroughputChart displayData={displayData} />
           </div>
         </div>
 
         {/* Bottom Section: Stats + Errors */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <StatsPanel metrics={latestMetrics} />
-          <ErrorList errors={latestMetrics?.recent_errors} />
+          <ErrorList errors={recentErrors} />
         </div>
       </main>
     </div>

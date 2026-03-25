@@ -73,8 +73,11 @@ func (hub *WebSocketHub) StartBroadcast() {
 	ticker := time.NewTicker(hub.interval)
 	defer ticker.Stop()
 
+	var lastErrorsVersion int64
 	for range ticker.C {
-		snapshot := hub.collector.Snapshot(hub.interval)
+		errVersion := hub.collector.ErrorsVersion()
+		snapshot := hub.collector.Snapshot(hub.interval, lastErrorsVersion)
+		lastErrorsVersion = errVersion
 		hub.broadcast(snapshot)
 	}
 }
@@ -90,6 +93,7 @@ func (hub *WebSocketHub) broadcast(snapshot metrics.MetricsSnapshot) {
 	defer hub.mu.RUnlock()
 
 	for conn := range hub.clients {
+		conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
 		err := conn.WriteMessage(websocket.TextMessage, data)
 		if err != nil {
 			log.Printf("WebSocket write error: %v", err)

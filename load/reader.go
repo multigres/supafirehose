@@ -104,13 +104,15 @@ func (w *ReadWorker) runWithConnection(ctx context.Context, conn *pgx.Conn) {
 				return
 			}
 
-			// Execute query
-			w.executeRead(ctx, conn)
+			// Execute query; abandon connection on error to force reconnect
+			if err := w.executeRead(ctx, conn); err != nil {
+				return
+			}
 		}
 	}
 }
 
-func (w *ReadWorker) executeRead(ctx context.Context, conn *pgx.Conn) {
+func (w *ReadWorker) executeRead(ctx context.Context, conn *pgx.Conn) error {
 	start := time.Now()
 
 	// Random ID within the known range
@@ -126,7 +128,8 @@ func (w *ReadWorker) executeRead(ctx context.Context, conn *pgx.Conn) {
 
 	// Don't record context cancellation as an error (expected during shutdown)
 	if err != nil && ctx.Err() != nil {
-		return
+		return err
 	}
 	w.collector.RecordRead(latency, err)
+	return err
 }

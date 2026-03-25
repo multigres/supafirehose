@@ -28,6 +28,7 @@ type Collector struct {
 	recentErrors    []ErrorEntry
 	lastErrorTime   time.Time
 	maxRecentErrors int
+	errorsVersion   int64 // incremented when recentErrors changes
 
 	// Pool stats function
 	poolStatsFunc func() PoolStats
@@ -96,10 +97,12 @@ func (c *Collector) addError(errMsg string) {
 	if len(c.recentErrors) > c.maxRecentErrors {
 		c.recentErrors = c.recentErrors[len(c.recentErrors)-c.maxRecentErrors:]
 	}
+	c.errorsVersion++
 }
 
-// Snapshot returns current metrics and resets window counters
-func (c *Collector) Snapshot(interval time.Duration) MetricsSnapshot {
+// Snapshot returns current metrics and resets window counters.
+// If lastErrorsVersion matches the current errors version, RecentErrors is omitted.
+func (c *Collector) Snapshot(interval time.Duration, lastErrorsVersion int64) MetricsSnapshot {
 	// Get histogram snapshots (this also resets them)
 	readHist := c.readLatencies.SnapshotAndReset()
 	writeHist := c.writeLatencies.SnapshotAndReset()
@@ -131,10 +134,14 @@ func (c *Collector) Snapshot(interval time.Duration) MetricsSnapshot {
 		poolStats = c.poolStatsFunc()
 	}
 
-	// Get recent errors
+	// Only include recent errors if they've changed since caller last saw them
+	var recentErrors []ErrorEntry
 	c.mu.RLock()
-	recentErrors := make([]ErrorEntry, len(c.recentErrors))
-	copy(recentErrors, c.recentErrors)
+	currentVersion := c.errorsVersion
+	if currentVersion != lastErrorsVersion {
+		recentErrors = make([]ErrorEntry, len(c.recentErrors))
+		copy(recentErrors, c.recentErrors)
+	}
 	c.mu.RUnlock()
 
 	return MetricsSnapshot{
@@ -163,6 +170,13 @@ func (c *Collector) Snapshot(interval time.Duration) MetricsSnapshot {
 	}
 }
 
+// ErrorsVersion returns the current errors version counter.
+func (c *Collector) ErrorsVersion() int64 {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.errorsVersion
+}
+
 // Reset clears all metrics
 func (c *Collector) Reset() {
 	c.readLatencies.SnapshotAndReset()
@@ -179,6 +193,7 @@ func (c *Collector) Reset() {
 	c.mu.Lock()
 	c.recentErrors = make([]ErrorEntry, 0)
 	c.lastErrorTime = time.Time{}
+	c.errorsVersion++
 	c.mu.Unlock()
 }
 

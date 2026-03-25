@@ -35,6 +35,6 @@ type TotalStats struct {
 // PoolStats holds connection pool metrics
 type PoolStats struct {
 	ActiveConnections int32 `json:"active_connections"`
-	IdleConnections   int32 `json:"idle_connections"`
-	WaitingRequests   int32 `json:"waiting_requests"`
+	IdleConnections   int32 `json:"idle_connections,omitempty"`
+	WaitingRequests   int32 `json:"waiting_requests,omitempty"`
 }
